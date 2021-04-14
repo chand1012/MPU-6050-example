@@ -1,19 +1,7 @@
 #pragma once
 
+#include <Arduino.h>
 #include <Wire.h>
-
-// gyroscope corrections
-const int GyXcal = 480;
-const int GyYcal = 170;
-const int GyZcal = 210;
-
-// accelerometer corrections
-const int AcXcal = -950;
-const int AcYcal = -300;
-const int AcZcal = 0;
-
-// temp correction
-const int tcal = -1600;
 
 class MPU6050 {
     private:
@@ -23,6 +11,18 @@ class MPU6050 {
         int Tmp; // temperature data
         int GyX, GyY, GyZ; // gyro data
         void getData();
+        // gyroscope corrections
+        int GyXcal = 480;
+        int GyYcal = 170;
+        int GyZcal = 210;
+
+        // accelerometer corrections
+        int AcXcal = -950;
+        int AcYcal = -300;
+        int AcZcal = 0;
+
+        // temp correction
+        int tcal = -16000;
 
     public:
         MPU6050(TwoWire& Wire);
@@ -34,6 +34,10 @@ class MPU6050 {
         int getGyroZ();
         int getTempC();
         int getTempF();
+        void calibrateTempOffset(float currentTempF);
+        void getRawGyro(int& X, int& Y, int& Z);
+        void getRawAcc(int& X, int& Y, int& Z);
+        String outputCSV();
 };
 
 MPU6050::MPU6050(TwoWire& Wire) : Wire(Wire) {
@@ -62,6 +66,13 @@ void MPU6050::getData() {
     GyZ=Wire.read()<<8|Wire.read(); // 0x47 (GYRO_ZOUT_H) 0x48 (GYRO_ZOUT_L) 
 }
 
+void MPU6050::getRawAcc(int& X, int& Y, int& Z) {
+    getData();
+    X = AcX;
+    Y = AcY;
+    Z = AcZ;
+}
+
 int MPU6050::getAccX() {
     getData();
     return AcX + AcXcal;
@@ -75,6 +86,13 @@ int MPU6050::getAccY() {
 int MPU6050::getAccZ() {
     getData();
     return AcZ + AcZcal;
+}
+
+void MPU6050::getRawGyro(int& X, int& Y, int& Z) {
+    getData();
+    X = GyX;
+    Y = GyY;
+    Z = GyZ;
 }
 
 int MPU6050::getGyroX() {
@@ -92,6 +110,12 @@ int MPU6050::getGyroZ() {
     return GyZ + GyZcal;
 }
 
+void MPU6050::calibrateTempOffset(float currentTempF) {
+    getData();
+    float tx = (currentTempF - 36.53) * 340;
+    tcal = tx - Tmp;
+}
+
 int MPU6050::getTempC() {
     getData();
     int tx = Tmp + tcal;
@@ -101,4 +125,15 @@ int MPU6050::getTempC() {
 int MPU6050::getTempF() {
     getData();
     return (getTempC() * 9/5) + 32;
+}
+
+String MPU6050::outputCSV() {
+    String output = "acc,";
+    output += String(getAccX()) + ",";
+    output += String(getAccY()) + ",";
+    output += String(getAccZ()) + ",";
+    output += "gyro," + String(getGyroX()) + ",";
+    output += String(getGyroY()) + ",";
+    output += String(getGyroZ()) + ",";
+    return output;
 }
